@@ -1,0 +1,26 @@
+# Environment secrets - never bake these into the image
+.env
+.env.*
+backend/.env
+frontend/.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Frontend build artifacts and deps
+frontend/node_modules/
+frontend/build/
+
+# Git
+.git/
+.gitignore
+
+# Misc
+.DS_Store
+*.log
+.idea/
+.vscode/

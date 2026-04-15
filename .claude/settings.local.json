@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/Users/AshishVishwakarma/Downloads/my_project/backend/.env*)",
+      "Bash(ls /c/Users/AshishVishwakarma/Downloads/my_project/frontend/.env*)"
+    ]
+  }
+}
