@@ -1,7 +1,4 @@
-Yes, exactly! Push the **`frontend/`** and **`backend/`** folders to your GitHub repo.
-
-But before you push, let me add Railway deployment configs so it just works out of the box:
-Action: file_editor create /app/Dockerfile --file-text "FROM node:18-alpine AS frontend-build
+"FROM node:18-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/yarn.lock ./
 RUN yarn install --frozen-lockfile
