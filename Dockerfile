@@ -1,4 +1,4 @@
-"FROM node:18-alpine AS frontend-build
+FROM node:18-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/yarn.lock ./
 RUN yarn install --frozen-lockfile
@@ -15,7 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./backend/
 
-RUN pip install --no-cache-dir nginx-static || true
 RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
 
 COPY --from=frontend-build /app/frontend/build /app/static
@@ -28,4 +27,3 @@ RUN chmod +x /app/start.sh
 EXPOSE 8080
 
 CMD [\"/app/start.sh\"]
-"
