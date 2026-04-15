@@ -8,7 +8,7 @@ import ResultsDisplay from "./ResultsDisplay";
 import FollowUpActions from "./FollowUpActions";
 import LoadingState from "./LoadingState";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
 
 const PHASES = {
   INPUT: "input",
