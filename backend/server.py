@@ -15,13 +15,10 @@ from groq import AsyncGroq
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# Groq client (FREE - Llama 3.3 70B)
-groq_client = AsyncGroq(api_key=os.environ.get('GROQ_API_KEY'))
+# MongoDB and Groq clients — initialized in startup event
+client = None
+db = None
+groq_client = None
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -249,6 +246,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_db_client():
+    global client, db, groq_client
+    mongo_url = os.environ.get('MONGO_URL')
+    db_name = os.environ.get('DB_NAME', 'thought_lab')
+    if not mongo_url:
+        logger.error("MONGO_URL environment variable is not set — database will be unavailable")
+    else:
+        client = AsyncIOMotorClient(mongo_url)
+        db = client[db_name]
+        logger.info(f"Connected to MongoDB database: {db_name}")
+    groq_client = AsyncGroq(api_key=os.environ.get('GROQ_API_KEY'))
+    logger.info("Startup complete")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    if client:
+        client.close()
