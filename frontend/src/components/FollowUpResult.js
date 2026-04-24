@@ -160,7 +160,7 @@ function DecideResult({ data }) {
   );
 }
 
-export default function FollowUpResult({ followUp, lenses }) {
+export default function FollowUpResult({ followUp }) {
   const config = actionLabels[followUp.action] || actionLabels.deeper;
   const ActionIcon = config.icon;
 

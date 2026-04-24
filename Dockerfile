@@ -2,7 +2,7 @@ FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json ./
 COPY frontend/yarn.lock* ./
-RUN yarn install
+RUN yarn install --frozen-lockfile
 COPY frontend/ .
 ARG REACT_APP_BACKEND_URL
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./backend/
 
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends bash nginx && rm -rf /var/lib/apt/lists/*
 
 COPY --from=frontend-build /app/frontend/build /app/static
 
@@ -27,4 +27,4 @@ RUN chmod +x /app/start.sh
 
 EXPOSE 8080
 
-CMD [\"/app/start.sh\"]
+CMD ["/app/start.sh"]

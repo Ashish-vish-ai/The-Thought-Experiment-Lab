@@ -5,9 +5,11 @@ export default function TypewriterText({ text, speed = 15, delay = 0 }) {
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
+    setDisplayed("");
+    setStarted(false);
     const delayTimer = setTimeout(() => setStarted(true), delay);
     return () => clearTimeout(delayTimer);
-  }, [delay]);
+  }, [delay, text]);
 
   useEffect(() => {
     if (!started || !text) return;

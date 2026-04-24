@@ -1,14 +1,15 @@
-import { useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import axios from "axios";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import DilemmaInput from "./DilemmaInput";
-import LensSelector from "./LensSelector";
-import ResultsDisplay from "./ResultsDisplay";
 import FollowUpActions from "./FollowUpActions";
+import LensSelector from "./LensSelector";
 import LoadingState from "./LoadingState";
+import ResultsDisplay from "./ResultsDisplay";
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL || ""}/api`;
 
 const PHASES = {
   INPUT: "input",
@@ -36,44 +37,74 @@ export default function ThoughtLab() {
   const [experiment, setExperiment] = useState(null);
   const [followUps, setFollowUps] = useState([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [resolutionLoading, setResolutionLoading] = useState(false);
+  const [resolutionFeedback, setResolutionFeedback] = useState(null);
 
   const handleDilemmaSubmit = useCallback((text) => {
     setDilemma(text);
+    setResolutionFeedback(null);
     setPhase(PHASES.LENSES);
   }, []);
 
   const handleRunExperiment = useCallback(async (lenses) => {
     setSelectedLenses(lenses);
     setPhase(PHASES.LOADING);
+
     try {
       const { data } = await axios.post(`${API}/experiments/run`, {
         dilemma,
-        lenses: lenses.map((l) => ({ name: l.name, category: l.category })),
+        lenses: lenses.map((lens) => ({ name: lens.name, category: lens.category })),
       });
+
       setExperiment(data);
-      setFollowUps([]);
+      setFollowUps(data.follow_ups || []);
+      setResolutionFeedback(data.resolution_action || null);
       setPhase(PHASES.RESULTS);
     } catch (err) {
-      toast.error("Something went wrong generating insights. Please try again.");
+      toast.error(err?.response?.data?.detail || "Something went wrong generating insights. Please try again.");
       setPhase(PHASES.LENSES);
     }
   }, [dilemma]);
 
   const handleFollowUp = useCallback(async (action, lensName) => {
     if (!experiment) return;
+
     setFollowUpLoading(true);
     try {
-      const { data } = await axios.post(
-        `${API}/experiments/${experiment.id}/followup`,
-        { action, lens_name: lensName }
-      );
+      const { data } = await axios.post(`${API}/experiments/${experiment.id}/followup`, {
+        action,
+        lens_name: lensName,
+      });
+
       setFollowUps((prev) => [...prev, data]);
+      setExperiment((prev) => (
+        prev
+          ? { ...prev, follow_ups: [...(prev.follow_ups || []), data] }
+          : prev
+      ));
     } catch (err) {
-      toast.error("Failed to get follow-up. Try again.");
+      toast.error(err?.response?.data?.detail || "Failed to get follow-up. Try again.");
     } finally {
       setFollowUpLoading(false);
     }
   }, [experiment]);
+
+  const handleResolution = useCallback(async (action) => {
+    if (!experiment || resolutionLoading) return;
+
+    setResolutionLoading(true);
+    try {
+      const { data } = await axios.post(`${API}/experiments/${experiment.id}/resolve`, { action });
+      setExperiment(data);
+      setFollowUps(data.follow_ups || []);
+      setResolutionFeedback(data.resolution_action || action);
+      toast.success(action === "clarity" ? "Thought cycle closed." : "Session saved for reflection.");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not update the session right now.");
+    } finally {
+      setResolutionLoading(false);
+    }
+  }, [experiment, resolutionLoading]);
 
   const handleStartOver = useCallback(() => {
     setPhase(PHASES.INPUT);
@@ -81,6 +112,7 @@ export default function ThoughtLab() {
     setSelectedLenses([]);
     setExperiment(null);
     setFollowUps([]);
+    setResolutionFeedback(null);
   }, []);
 
   const handleBackToLenses = useCallback(() => {
@@ -89,22 +121,19 @@ export default function ThoughtLab() {
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-screen relative overflow-hidden"
       style={{ backgroundColor: "var(--bg-main)" }}
       data-testid="thought-lab-container"
     >
-      {/* Subtle texture overlay */}
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.08] mix-blend-multiply"
         style={{
-          backgroundImage: `url(https://static.prod-images.emergentagent.com/jobs/3ece4255-5225-4b01-943d-927b4db876e3/images/3cd606ddd9afe5de0ce9719ba3f0e494df5c771b7e872568f8f1a244c32f4683.png)`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundImage:
+            "radial-gradient(circle at 20% 20%, rgba(93, 78, 109, 0.08), transparent 26%), radial-gradient(circle at 80% 12%, rgba(79, 99, 84, 0.08), transparent 24%), radial-gradient(circle at 50% 80%, rgba(142, 106, 75, 0.08), transparent 30%)",
         }}
       />
 
       <div className="relative z-10">
-        {/* Header */}
         <header className="px-6 sm:px-12 pt-8 pb-4">
           <motion.div
             initial={{ opacity: 0 }}
@@ -112,11 +141,7 @@ export default function ThoughtLab() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="flex items-center justify-between max-w-3xl mx-auto"
           >
-            <button
-              onClick={handleStartOver}
-              className="group flex items-center gap-2"
-              data-testid="logo-home-btn"
-            >
+            <Link to="/" className="group flex items-center gap-2" data-testid="logo-home-btn">
               <span
                 className="text-xs uppercase tracking-[0.25em] font-medium"
                 style={{
@@ -126,7 +151,8 @@ export default function ThoughtLab() {
               >
                 Thought Experiment Lab
               </span>
-            </button>
+            </Link>
+
             {phase !== PHASES.INPUT && (
               <motion.button
                 initial={{ opacity: 0 }}
@@ -141,15 +167,19 @@ export default function ThoughtLab() {
                 whileHover={{ backgroundColor: "var(--cat-quick-bg)" }}
                 data-testid="start-over-btn"
               >
-                Start over
+                Start fresh
               </motion.button>
             )}
           </motion.div>
         </header>
 
-        {/* Main content */}
         <main className="px-6 sm:px-12 pb-24">
           <div className="max-w-3xl mx-auto">
+            <div className="mb-8 tool-frame-note">
+              <span>Stored session, no account.</span>
+              <span>If something feels dangerous or life-threatening, get human help before using the lab.</span>
+            </div>
+
             <AnimatePresence mode="wait">
               {phase === PHASES.INPUT && (
                 <motion.div
@@ -196,23 +226,24 @@ export default function ThoughtLab() {
 
               {phase === PHASES.RESULTS && experiment && (
                 <motion.div
-                  key="results"
+                  key={`results-${experiment.id}`}
                   variants={pageVariants}
                   initial="enter"
                   animate="center"
                   exit="exit"
                   transition={pageTransition}
                 >
-                  <ResultsDisplay
-                    experiment={experiment}
-                    followUps={followUps}
-                  />
+                  <ResultsDisplay experiment={experiment} followUps={followUps} />
                   <FollowUpActions
                     experiment={experiment}
                     followUps={followUps}
                     onFollowUp={handleFollowUp}
+                    onResolve={handleResolution}
                     loading={followUpLoading}
+                    resolutionLoading={resolutionLoading}
+                    resolutionFeedback={resolutionFeedback}
                     onBackToLenses={handleBackToLenses}
+                    onStartOver={handleStartOver}
                   />
                 </motion.div>
               )}

@@ -52,11 +52,22 @@ export default function DilemmaInput({ onSubmit }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.25 }}
-        className="text-base mb-12"
+        className="text-base mb-6"
         style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
         data-testid="hero-subtitle"
       >
-        Describe a dilemma, decision, or idea you're wrestling with.
+        Describe a dilemma, decision, or idea you're wrestling with. Honest is better than polished.
+      </motion.p>
+
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.33 }}
+        className="text-sm mb-12 max-w-2xl"
+        style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
+      >
+        Your session is stored without an account so you can finish the thought cycle. If this is an emergency or
+        something life-threatening, do not use the lab as your only support.
       </motion.p>
 
       <motion.div
@@ -91,7 +102,7 @@ export default function DilemmaInput({ onSubmit }) {
             className="text-xs tracking-wide"
             style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
           >
-            {isValid ? "Press Cmd+Enter or click to continue" : "Keep writing..."}
+            {isValid ? "Press Cmd+Enter or click to continue" : "Keep writing until the real tension shows up..."}
           </span>
 
           <motion.button
