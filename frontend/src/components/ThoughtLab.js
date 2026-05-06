@@ -8,8 +8,27 @@ import FollowUpActions from "./FollowUpActions";
 import LensSelector from "./LensSelector";
 import LoadingState from "./LoadingState";
 import ResultsDisplay from "./ResultsDisplay";
+import ThemeToggle from "./ThemeToggle";
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ""}/api`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function resolveApiBase() {
+  const configured = (process.env.REACT_APP_BACKEND_URL || "").trim().replace(/\/+$/, "");
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isLocalHost = host === "localhost" || host === "127.0.0.1";
+    const configuredIsLocal = configured.includes("localhost") || configured.includes("127.0.0.1");
+
+    if (isLocalHost && !configuredIsLocal) {
+      return "http://localhost:8001/api";
+    }
+  }
+
+  return configured ? `${configured}/api` : "/api";
+}
+
+const API = resolveApiBase();
 
 const PHASES = {
   INPUT: "input",
@@ -30,31 +49,61 @@ const pageTransition = {
   duration: 0.5,
 };
 
-export default function ThoughtLab() {
+export default function ThoughtLab({ theme, onToggleTheme }) {
   const [phase, setPhase] = useState(PHASES.INPUT);
   const [dilemma, setDilemma] = useState("");
   const [selectedLenses, setSelectedLenses] = useState([]);
   const [experiment, setExperiment] = useState(null);
   const [followUps, setFollowUps] = useState([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [preflightLoading, setPreflightLoading] = useState(false);
   const [resolutionLoading, setResolutionLoading] = useState(false);
   const [resolutionFeedback, setResolutionFeedback] = useState(null);
 
-  const handleDilemmaSubmit = useCallback((text) => {
+  const handleDilemmaSubmit = useCallback(async (text) => {
+    setPreflightLoading(true);
     setDilemma(text);
+    setExperiment(null);
+    setFollowUps([]);
+    setSelectedLenses([]);
     setResolutionFeedback(null);
-    setPhase(PHASES.LENSES);
+
+    try {
+      const [{ data }] = await Promise.all([
+        axios.post(`${API}/experiments/preflight`, { dilemma: text }),
+        sleep(900),
+      ]);
+
+      if (data.status === "safety_hold") {
+        setExperiment(data);
+        setFollowUps(data.follow_ups || []);
+        setPhase(PHASES.RESULTS);
+        return;
+      }
+
+      const suggested = data.suggested_lenses || [];
+      setSelectedLenses(suggested);
+      setPhase(PHASES.LENSES);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not review that thought right now. Please try again.");
+    } finally {
+      setPreflightLoading(false);
+    }
   }, []);
 
-  const handleRunExperiment = useCallback(async (lenses) => {
+  const handleRunExperiment = useCallback(async (lenses, source = null) => {
     setSelectedLenses(lenses);
     setPhase(PHASES.LOADING);
 
     try {
-      const { data } = await axios.post(`${API}/experiments/run`, {
-        dilemma,
-        lenses: lenses.map((lens) => ({ name: lens.name, category: lens.category })),
-      });
+      const [{ data }] = await Promise.all([
+        axios.post(`${API}/experiments/run`, {
+          dilemma,
+          lenses: lenses.map((lens) => ({ name: lens.name, category: lens.category })),
+          lenses_source: source,
+        }),
+        sleep(1100),
+      ]);
 
       setExperiment(data);
       setFollowUps(data.follow_ups || []);
@@ -113,6 +162,7 @@ export default function ThoughtLab() {
     setExperiment(null);
     setFollowUps([]);
     setResolutionFeedback(null);
+    setPreflightLoading(false);
   }, []);
 
   const handleBackToLenses = useCallback(() => {
@@ -128,8 +178,9 @@ export default function ThoughtLab() {
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.08] mix-blend-multiply"
         style={{
-          backgroundImage:
-            "radial-gradient(circle at 20% 20%, rgba(93, 78, 109, 0.08), transparent 26%), radial-gradient(circle at 80% 12%, rgba(79, 99, 84, 0.08), transparent 24%), radial-gradient(circle at 50% 80%, rgba(142, 106, 75, 0.08), transparent 30%)",
+          backgroundImage: theme === "dark"
+            ? "radial-gradient(circle at 20% 20%, rgba(122, 104, 144, 0.16), transparent 26%), radial-gradient(circle at 80% 12%, rgba(88, 119, 99, 0.16), transparent 24%), radial-gradient(circle at 50% 80%, rgba(164, 123, 89, 0.16), transparent 30%)"
+            : "radial-gradient(circle at 20% 20%, rgba(93, 78, 109, 0.08), transparent 26%), radial-gradient(circle at 80% 12%, rgba(79, 99, 84, 0.08), transparent 24%), radial-gradient(circle at 50% 80%, rgba(142, 106, 75, 0.08), transparent 30%)",
         }}
       />
 
@@ -153,33 +204,31 @@ export default function ThoughtLab() {
               </span>
             </Link>
 
-            {phase !== PHASES.INPUT && (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onClick={handleStartOver}
-                className="text-xs uppercase tracking-[0.2em] px-4 py-2 rounded-full transition-colors"
-                style={{
-                  fontFamily: "var(--font-body)",
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--accent-border)",
-                }}
-                whileHover={{ backgroundColor: "var(--cat-quick-bg)" }}
-                data-testid="start-over-btn"
-              >
-                Start fresh
-              </motion.button>
-            )}
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
+              {phase !== PHASES.INPUT && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={handleStartOver}
+                  className="text-xs uppercase tracking-[0.2em] px-4 py-2 rounded-full transition-colors"
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--accent-border)",
+                  }}
+                  whileHover={{ backgroundColor: "var(--cat-quick-bg)" }}
+                  data-testid="start-over-btn"
+                >
+                  Start fresh
+                </motion.button>
+              )}
+            </div>
           </motion.div>
         </header>
 
         <main className="px-6 sm:px-12 pb-24">
           <div className="max-w-3xl mx-auto">
-            <div className="mb-8 tool-frame-note">
-              <span>Stored session, no account.</span>
-              <span>If something feels dangerous or life-threatening, get human help before using the lab.</span>
-            </div>
-
             <AnimatePresence mode="wait">
               {phase === PHASES.INPUT && (
                 <motion.div
@@ -190,7 +239,7 @@ export default function ThoughtLab() {
                   exit="exit"
                   transition={pageTransition}
                 >
-                  <DilemmaInput onSubmit={handleDilemmaSubmit} />
+                  <DilemmaInput onSubmit={handleDilemmaSubmit} loading={preflightLoading} />
                 </motion.div>
               )}
 
@@ -207,6 +256,7 @@ export default function ThoughtLab() {
                     onRun={handleRunExperiment}
                     onBack={() => setPhase(PHASES.INPUT)}
                     dilemma={dilemma}
+                    suggestedLenses={selectedLenses}
                   />
                 </motion.div>
               )}
@@ -243,6 +293,7 @@ export default function ThoughtLab() {
                     resolutionLoading={resolutionLoading}
                     resolutionFeedback={resolutionFeedback}
                     onBackToLenses={handleBackToLenses}
+                    onBackToInput={() => setPhase(PHASES.INPUT)}
                     onStartOver={handleStartOver}
                   />
                 </motion.div>

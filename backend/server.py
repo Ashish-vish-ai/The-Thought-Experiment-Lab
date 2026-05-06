@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import os
 import re
@@ -24,6 +24,7 @@ MAX_DILEMMA_CHARS = int(os.environ.get("MAX_DILEMMA_CHARS", "1600"))
 MAX_FOLLOWUPS = int(os.environ.get("MAX_FOLLOWUPS", "4"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "900"))
 RATE_LIMITS = {
+    "preflight": int(os.environ.get("RATE_LIMIT_PREFLIGHT", "24")),
     "run": int(os.environ.get("RATE_LIMIT_RUN", "12")),
     "followup": int(os.environ.get("RATE_LIMIT_FOLLOWUP", "20")),
     "resolve": int(os.environ.get("RATE_LIMIT_RESOLVE", "16")),
@@ -81,6 +82,11 @@ class LensSelection(BaseModel):
 class RunExperimentRequest(BaseModel):
     dilemma: str = Field(min_length=12, max_length=MAX_DILEMMA_CHARS)
     lenses: list[LensSelection]
+    lenses_source: Optional[Literal["suggested", "manual"]] = None
+
+
+class PreflightExperimentRequest(BaseModel):
+    dilemma: str = Field(min_length=12, max_length=MAX_DILEMMA_CHARS)
 
 
 class FollowUpRequest(BaseModel):
@@ -90,6 +96,64 @@ class FollowUpRequest(BaseModel):
 
 class ResolveExperimentRequest(BaseModel):
     action: Literal["clarity", "sit_with_it"]
+
+
+LENS_CATALOG = [
+    {
+        "name": "Trolley problem",
+        "category": "Quick & fun",
+        "signals": ["trade-off", "tradeoff", "cost", "costs", "sacrifice", "choose between", "harm", "priority"],
+    },
+    {
+        "name": "Veil of ignorance",
+        "category": "Deep",
+        "signals": ["fair", "fairness", "unfair", "privilege", "position", "role", "bias", "everyone"],
+    },
+    {
+        "name": "Regret minimization",
+        "category": "Practical",
+        "signals": ["regret", "future", "later", "leave", "stay", "risk", "opportunity", "career", "job", "move"],
+    },
+    {
+        "name": "Pre-mortem",
+        "category": "Practical",
+        "signals": ["fail", "failure", "wrong", "mess", "fear", "risk", "backfire", "collapse", "uncertain"],
+    },
+    {
+        "name": "Double the stakes",
+        "category": "Quick & fun",
+        "signals": ["family", "team", "company", "others", "impact", "consequence", "responsibility"],
+    },
+    {
+        "name": "Alien observer",
+        "category": "Quick & fun",
+        "signals": ["overthinking", "spiral", "loop", "embarrassed", "ashamed", "normal", "should", "supposed to"],
+    },
+    {
+        "name": "Experience machine",
+        "category": "Deep",
+        "signals": ["happy", "comfort", "comfortable", "dream", "ideal", "authentic", "real", "meaning"],
+    },
+    {
+        "name": "Categorical imperative",
+        "category": "Deep",
+        "signals": ["honest", "lie", "promise", "duty", "principle", "everyone", "standard", "integrity"],
+    },
+    {
+        "name": "10-year test",
+        "category": "Practical",
+        "signals": ["decade", "long-term", "future", "later", "aging", "older", "next year", "10 year", "ten year"],
+    },
+    {
+        "name": "Best friend's advice",
+        "category": "Practical",
+        "signals": ["friend", "relationship", "partner", "family", "love", "advice", "guilt", "support"],
+    },
+]
+
+LENS_LOOKUP = {lens["name"]: lens for lens in LENS_CATALOG}
+DEFAULT_LENS_NAMES = ["Regret minimization", "Pre-mortem", "Veil of ignorance"]
+JSON_ONLY_SYSTEM_MESSAGE = "You are a JSON-only responder. Return only valid JSON, no markdown, no code fences."
 
 
 def now_iso() -> str:
@@ -157,7 +221,7 @@ async def call_llm(system_message: str, user_message: str) -> dict:
             {"role": "user", "content": user_message},
         ],
         model=MODEL_NAME,
-        temperature=0.7,
+        temperature=0.55,
         max_tokens=4096,
     )
     content = chat_completion.choices[0].message.content or "{}"
@@ -235,32 +299,69 @@ def build_safety_payload(category: str) -> dict:
     }
 
 
+def suggest_lenses(dilemma: str, count: int = 3) -> list[dict]:
+    text = clean_text(dilemma).lower()
+    scores = []
+
+    for index, lens in enumerate(LENS_CATALOG):
+        score = sum(1 for signal in lens["signals"] if signal in text)
+        scores.append((score, -index, lens["name"]))
+
+    scores.sort(reverse=True)
+
+    selected_names = [name for score, _, name in scores if score > 0]
+    for fallback in DEFAULT_LENS_NAMES:
+        if fallback not in selected_names:
+            selected_names.append(fallback)
+
+    selected_names = selected_names[:count]
+    return [
+        {
+            "name": LENS_LOOKUP[name]["name"],
+            "category": LENS_LOOKUP[name]["category"],
+        }
+        for name in selected_names
+    ]
+
+
+
+
 def build_experiment_prompt(dilemma: str, lenses: list[LensSelection]) -> str:
     lens_names = ", ".join(lens.name for lens in lenses)
     return (
-        f'You are a brilliant philosophy tutor and warm practical life coach. '
-        f'The user has a real dilemma: "{dilemma}". '
-        f'Apply each thought experiment framework below specifically to this dilemma. '
-        f'For each one write 3-5 sentences. Be concrete: reference their actual situation, not generic philosophy. '
-        f'Start with a vivid scenario or provocative angle. Add philosophical depth. '
-        f'End with one pointed question the user should sit with. '
-        f'Be direct, warm, and insightful - never academic or preachy. '
-        f'Frameworks: {lens_names}. '
+        f'You are the clarity engine inside Thought Experiment Lab. '
+        f'The user brought one real thought: "{dilemma}". '
+        f'Your job is to make that exact thought easier to understand, not to coach, reassure, therapize, or branch into unrelated topics. '
+        f'Use direct second-person voice. Say "you," not "the user." '
+        f'Use simple English. Use short sentences. Stay anchored to concrete details from the user input. '
+        f'Name the exact stuck point first. Say what you are stuck between. Say what is making this hard. Use the lenses only to make the thought clearer. '
+        f'Each lens must reveal a different part of the problem. Do not repeat the same insight in different words. '
+        f'If two lenses point to the same area, make one focus on risk, one on emotion, one on values, one on evidence, or another distinct angle. '
+        f'For each lens, answer: what does this lens reveal that the others do not? '
+        f'Avoid generic advice, motivational language, filler, theory words, sweeping philosophy, and sentences that could apply to anyone. '
+        f'Do not take sides. Do not invent new topics. Do not open a new thought loop. '
+        f'Do not make unsupported predictions. Do not say things like "you would likely regret" unless the user gave clear evidence. Prefer phrases like "one possible regret is" or "the risk you are weighing is." '
+        f'Do not jump to advice before naming the stuck point. Prefer "The stuck point is..." over "You should..." '
+        f'Use only these lenses: {lens_names}. '
+        f'For each lens, write 2-4 short sentences that stay specific to the dilemma and end in a clear insight, not a new open loop. '
+        f'Make the synthesis concrete. Say the hard choice in plain words. Say what you should stop trying to solve if it is not solvable right now. Do not end with vague lines like "focus on the key factors." '
         f'Respond with ONLY valid JSON: '
-        f'{{"frames":[{{"name":"framework name","insight":"3-5 sentence insight"}}],'
-        f'"summary":"one sentence naming the central tension beneath the dilemma",'
-        f'"synthesis":"2-3 sentences synthesizing what these lenses collectively reveal"}}'
+        f'{{"frames":[{{"name":"framework name","insight":"2-4 sentence insight"}}],'
+        f'"summary":"one short sentence saying what this is really about",'
+        f'"synthesis":"2-3 short sentences explaining what may be making this hard and what not to overthink next"}}'
     )
 
 
 def build_deeper_prompt(dilemma: str, frame_name: str, original_insight: str) -> str:
     return (
-        f'You are a brilliant philosophy tutor and warm practical life coach. '
-        f'The user has a dilemma: "{dilemma}". '
-        f'You previously analyzed it through the "{frame_name}" lens and said: "{original_insight}" '
-        f'Now go MUCH deeper on this specific framework. Explore the nuances, tensions, and hidden layers. '
-        f'Write 5-8 sentences. Be concrete, reference their actual situation. Push the analysis further. '
-        f'End with a deeper, more challenging question. '
+        f'You are the clarity engine inside Thought Experiment Lab. '
+        f'The user brought this thought: "{dilemma}". '
+        f'You previously used the "{frame_name}" lens and said: "{original_insight}" '
+        f'Now make that same point easier to see without drifting into a new topic. '
+        f'Use direct second-person voice. Say "you," not "the user." '
+        f'Use simple English. Use 3-5 short sentences. Stay specific, grounded, and neutral. '
+        f'Name the exact stuck point before giving any advice. Do not make unsupported predictions. Avoid sounding like a coach or philosophy lecturer. '
+        f'Do not end with a question unless the user directly asked one. If they did not ask a question, return an empty question field. '
         f'Respond with ONLY valid JSON: {{"name":"{frame_name}","deeper_insight":"your deeper analysis","question":"your deeper question"}}'
     )
 
@@ -268,12 +369,14 @@ def build_deeper_prompt(dilemma: str, frame_name: str, original_insight: str) ->
 def build_counter_prompt(dilemma: str, frames: list[dict], synthesis: str) -> str:
     insights_text = "; ".join(f'{frame["name"]}: {frame["insight"]}' for frame in frames)
     return (
-        f'You are a brilliant devil\'s advocate and critical thinker. '
-        f'The user has a dilemma: "{dilemma}". '
+        f'You are the clarity engine inside Thought Experiment Lab. '
+        f'The user brought this thought: "{dilemma}". '
         f'Previous analysis said: {insights_text}. Synthesis: {synthesis}. '
-        f'Now challenge every single insight fairly. '
-        f'For each framework, present the strongest counter-argument in 2-3 sentences. '
-        f'End with a revised synthesis that accounts for the strongest objections. '
+        f'Now show the strongest fair other side to each insight so the user does not mistake one framing for the whole truth. '
+        f'Use direct second-person voice. Say "you," not "the user." '
+        f'For each framework, write 2-3 short sentences that challenge the earlier take without becoming combative or abstract. '
+        f'Use simple English. Stay specific. Do not repeat the earlier insight in new words. Say what this counter-view reveals that the earlier take missed. '
+        f'Do not make unsupported predictions. End with a revised synthesis that makes the choice clearer in plain words instead of reopening the whole thought loop. '
         f'Respond with ONLY valid JSON: {{"counters":[{{"name":"framework name","counter":"counter argument"}}],'
         f'"revised_synthesis":"2-3 sentences revised synthesis"}}'
     )
@@ -286,16 +389,17 @@ def build_decide_prompt(dilemma: str, frames: list[dict], synthesis: str, follow
         followup_context = " Additional analysis: " + "; ".join(json.dumps(item.get("data", {})) for item in follow_ups)
 
     return (
-        f'You are a warm, decisive life coach who helps people make clear decisions. '
-        f'The user has a dilemma: "{dilemma}". '
+        f'You are the clarity engine inside Thought Experiment Lab. '
+        f'The user brought this thought: "{dilemma}". '
         f'You have already explored it: {context}. Synthesis: {synthesis}.{followup_context} '
-        f'Now help them decide. Be direct and personal. '
-        f'Give a clear recommendation with 3 concrete reasons. '
-        f'Acknowledge what they will sacrifice with this choice. '
-        f'End with an empowering statement about their ability to handle this. '
+        f'The user is now explicitly asking for decision support. Give a clear recommendation that stays anchored to the original thought. '
+        f'Use direct second-person voice. Say "you," not "the user." '
+        f'Use simple English. Use short sentences. Avoid generic advice, therapy language, theory words, and motivational slogans. '
+        f'Name the exact stuck point before the recommendation. Name the real trade-off in plain words. Do not make unsupported predictions. '
+        f'Give 3 concrete reasons, and end with one steady closing sentence that helps the user stop spinning without sounding like a coach. '
         f'Respond with ONLY valid JSON: {{"recommendation":"your clear recommendation",'
         f'"reasons":["reason 1","reason 2","reason 3"],'
-        f'"sacrifice":"what they give up","empowerment":"empowering closing statement"}}'
+        f'"sacrifice":"what they give up","empowerment":"steady closing statement"}}'
     )
 
 
@@ -316,12 +420,14 @@ def build_experiment_doc(
     synthesis: str = "",
     safety: Optional[dict] = None,
     status: str = "active",
+    lenses_source: Optional[str] = None,
 ) -> dict:
     return {
         "id": experiment_id,
         "status": status,
         "dilemma": dilemma,
         "lenses": lenses,
+        "lenses_source": lenses_source,
         "frames": frames or [],
         "summary": summary,
         "synthesis": synthesis,
@@ -370,10 +476,36 @@ async def ready():
     return payload
 
 
+@api_router.post("/experiments/preflight")
+async def preflight_experiment(request: Request, req: PreflightExperimentRequest):
+    enforce_rate_limit(request, "preflight")
+
+    dilemma = clean_text(req.dilemma)
+    safety_category = detect_safety_risk(dilemma)
+
+    if safety_category:
+        doc = build_experiment_doc(
+            str(uuid.uuid4()),
+            dilemma,
+            [],
+            summary="This reflection needs immediate human support, not more abstract analysis.",
+            safety=build_safety_payload(safety_category),
+            status="safety_hold",
+        )
+        if db is not None:
+            await db.experiments.insert_one(doc)
+        return sanitize_experiment(doc)
+
+    return {
+        "status": "ready",
+        "dilemma": dilemma,
+        "suggested_lenses": suggest_lenses(dilemma),
+    }
+
+
 @api_router.post("/experiments/run")
 async def run_experiment(request: Request, req: RunExperimentRequest):
     enforce_rate_limit(request, "run")
-    require_services()
 
     if len(req.lenses) < 2 or len(req.lenses) > 5:
         raise HTTPException(status_code=400, detail="Select 2-5 lenses.")
@@ -391,13 +523,17 @@ async def run_experiment(request: Request, req: RunExperimentRequest):
             summary="This reflection needs immediate human support, not more abstract analysis.",
             safety=build_safety_payload(safety_category),
             status="safety_hold",
+            lenses_source=req.lenses_source,
         )
-        await db.experiments.insert_one(doc)
+        if db is not None:
+            await db.experiments.insert_one(doc)
         return sanitize_experiment(doc)
+
+    require_services()
 
     try:
         result = await call_llm(
-            "You are a JSON-only responder. Return only valid JSON, no markdown, no code fences.",
+            JSON_ONLY_SYSTEM_MESSAGE,
             build_experiment_prompt(dilemma, req.lenses),
         )
     except Exception as exc:
@@ -411,6 +547,7 @@ async def run_experiment(request: Request, req: RunExperimentRequest):
         frames=result.get("frames", []),
         summary=clean_text(result.get("summary", "")),
         synthesis=clean_text(result.get("synthesis", "")),
+        lenses_source=req.lenses_source,
     )
     await db.experiments.insert_one(doc)
     return sanitize_experiment(doc)
@@ -452,7 +589,7 @@ async def followup_experiment(experiment_id: str, request: Request, req: FollowU
 
     try:
         result = await call_llm(
-            "You are a JSON-only responder. Return only valid JSON, no markdown, no code fences.",
+            JSON_ONLY_SYSTEM_MESSAGE,
             prompt,
         )
     except Exception as exc:

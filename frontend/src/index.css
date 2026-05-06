@@ -7,6 +7,7 @@
 :root {
   --bg-main: #FDFCFB;
   --bg-surface: #FFFFFF;
+  --bg-surface-soft: rgba(255, 255, 255, 0.72);
   --bg-synthesis: #111110;
   --bg-synthesis-surface: #1A1A19;
   --text-primary: #1C1A19;
@@ -24,8 +25,34 @@
   --cat-practical-text: #8E6A4B;
   --accent-border: #E7E5E4;
   --accent-focus: #D6D3D1;
+  --focus-ring: rgba(93, 78, 109, 0.28);
   --font-heading: 'Cormorant Garamond', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-body: 'Manrope', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-main: #161311;
+  --bg-surface: #201b18;
+  --bg-surface-soft: rgba(31, 26, 23, 0.78);
+  --bg-synthesis: #0f0c0a;
+  --bg-synthesis-surface: #181310;
+  --text-primary: #F2E7DA;
+  --text-secondary: #C6B5A6;
+  --text-inverse: #FBF7F1;
+  --text-inverse-secondary: #D5C5B8;
+  --cat-quick-bg: rgba(84, 104, 88, 0.2);
+  --cat-quick-border: rgba(111, 145, 121, 0.3);
+  --cat-quick-text: #BFD3C0;
+  --cat-deep-bg: rgba(93, 78, 109, 0.24);
+  --cat-deep-border: rgba(130, 110, 151, 0.34);
+  --cat-deep-text: #D6C7E5;
+  --cat-practical-bg: rgba(142, 106, 75, 0.2);
+  --cat-practical-border: rgba(181, 141, 104, 0.3);
+  --cat-practical-text: #E4C6A8;
+  --accent-border: rgba(235, 215, 192, 0.14);
+  --accent-focus: rgba(214, 197, 182, 0.42);
+  --focus-ring: rgba(212, 185, 161, 0.26);
 }
 
 body {
@@ -35,6 +62,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-main);
   color: var(--text-primary);
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 a {
@@ -44,6 +72,24 @@ a {
 
 button {
   font: inherit;
+}
+
+button,
+a,
+textarea,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-radius: 0.9rem;
 }
 
 code {
@@ -133,4 +179,15 @@ code {
 ::selection {
   background-color: var(--cat-deep-bg);
   color: var(--cat-deep-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,18 +1,24 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
-export default function TypewriterText({ text, speed = 15, delay = 0 }) {
+export default function TypewriterText({ text, speed = 15, delay = 0, showAll = false }) {
   const [displayed, setDisplayed] = useState("");
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
+    if (showAll) {
+      setDisplayed(text || "");
+      setStarted(true);
+      return undefined;
+    }
+
     setDisplayed("");
     setStarted(false);
     const delayTimer = setTimeout(() => setStarted(true), delay);
     return () => clearTimeout(delayTimer);
-  }, [delay, text]);
+  }, [delay, showAll, text]);
 
   useEffect(() => {
-    if (!started || !text) return;
+    if (showAll || !started || !text) return;
     if (displayed.length >= text.length) return;
 
     const timer = setTimeout(() => {
@@ -20,7 +26,7 @@ export default function TypewriterText({ text, speed = 15, delay = 0 }) {
     }, speed);
 
     return () => clearTimeout(timer);
-  }, [started, displayed, text, speed]);
+  }, [showAll, started, displayed, text, speed]);
 
   if (!started) return null;
 

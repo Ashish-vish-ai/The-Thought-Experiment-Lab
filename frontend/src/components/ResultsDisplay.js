@@ -18,13 +18,21 @@ function getLensCategory(lensName, lenses) {
 export default function ResultsDisplay({ experiment, followUps }) {
   const [visibleFrames, setVisibleFrames] = useState(0);
   const [showSynthesis, setShowSynthesis] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     setVisibleFrames(0);
     setShowSynthesis(false);
+    setShowAll(false);
   }, [experiment.id]);
 
   useEffect(() => {
+    if (showAll) {
+      setVisibleFrames(experiment.frames?.length || 0);
+      setShowSynthesis(Boolean(experiment.synthesis));
+      return undefined;
+    }
+
     if (!experiment.frames?.length) {
       setShowSynthesis(Boolean(experiment.synthesis));
       return undefined;
@@ -37,20 +45,21 @@ export default function ResultsDisplay({ experiment, followUps }) {
 
     const timer = setTimeout(() => setShowSynthesis(true), 600);
     return () => clearTimeout(timer);
-  }, [visibleFrames, experiment.frames]);
+  }, [visibleFrames, experiment.frames, experiment.synthesis, showAll]);
 
   return (
     <div className="pt-8" data-testid="results-display">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-10">
+      {/* Dilemma quote — compact */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-7">
         <span
-          className="text-xs uppercase tracking-[0.2em] font-medium block mb-2"
+          className="text-xs uppercase tracking-[0.2em] font-medium block mb-1.5"
           style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
         >
           Your dilemma
         </span>
         <p
-          className="text-xl leading-relaxed"
-          style={{ fontFamily: "var(--font-heading)", fontStyle: "italic", color: "var(--text-primary)" }}
+          className="text-base leading-relaxed"
+          style={{ fontFamily: "var(--font-heading)", fontStyle: "italic", color: "var(--text-primary)", opacity: 0.8 }}
           data-testid="results-dilemma"
         >
           "{experiment.dilemma}"
@@ -80,7 +89,7 @@ export default function ResultsDisplay({ experiment, followUps }) {
                 Safety pause
               </span>
               <h3 className="text-2xl" style={{ fontFamily: "var(--font-heading)", fontWeight: 500 }}>
-                {experiment.safety?.title || "This sounds too serious for the normal reflection flow."}
+                {experiment.safety?.title || "This sounds like it needs more than a thought exercise."}
               </h3>
             </div>
           </div>
@@ -114,104 +123,96 @@ export default function ResultsDisplay({ experiment, followUps }) {
         </motion.div>
       ) : (
         <>
-          <div className="mb-6 clarity-summary-card">
-            <span className="section-eyebrow">What the session seems to be circling</span>
+          {/* Central insight block */}
+          <div className="mb-7 clarity-summary-card">
+            <div className="results-summary-header">
+              <span className="section-eyebrow">What this is really about</span>
+              {!showAll && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(true)}
+                  className="results-scan-toggle"
+                  data-testid="show-all-results-btn"
+                >
+                  Show all
+                </button>
+              )}
+            </div>
             <p>{experiment.summary || experiment.synthesis}</p>
           </div>
 
-          <div className="relative">
-            <div
-              className="absolute left-[15px] top-0 bottom-0 w-px"
-              style={{ backgroundColor: "var(--accent-border)" }}
-            />
+          {/* Lens perspectives — vertical stack */}
+          <div className="space-y-3">
+            {experiment.frames.map((frame, idx) => {
+              if (idx >= visibleFrames) return null;
 
-            <div className="space-y-0">
-              {experiment.frames.map((frame, idx) => {
-                if (idx >= visibleFrames) return null;
+              const category = getLensCategory(frame.name, experiment.lenses);
+              const cat = categoryConfig[category] || categoryConfig.Practical;
 
-                const category = getLensCategory(frame.name, experiment.lenses);
-                const cat = categoryConfig[category] || categoryConfig.Practical;
-                const CatIcon = cat.icon;
-
-                return (
-                  <motion.div
-                    key={frame.name}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-                    className="relative pl-12 pb-10"
-                    data-testid={`result-frame-${frame.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
-                  >
-                    <div
-                      className="absolute left-[7px] top-1 w-[17px] h-[17px] rounded-full flex items-center justify-center z-10"
-                      style={{ backgroundColor: cat.bg, border: `2px solid ${cat.border}` }}
+              return (
+                <motion.div
+                  key={frame.name}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                  className="result-frame-card"
+                  data-testid={`result-frame-${frame.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                >
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <h3
+                      className="text-lg sm:text-xl tracking-tight"
+                      style={{ fontFamily: "var(--font-heading)", fontWeight: 500 }}
                     >
-                      <CatIcon size={9} style={{ color: cat.text }} />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3
-                          className="text-xl sm:text-2xl tracking-tight"
-                          style={{ fontFamily: "var(--font-heading)", fontWeight: 500 }}
-                        >
-                          {frame.name}
-                        </h3>
-                        <span
-                          className="text-[10px] uppercase tracking-[0.15em] px-2 py-0.5 rounded-full font-medium"
-                          style={{
-                            backgroundColor: cat.bg,
-                            color: cat.text,
-                            border: `1px solid ${cat.border}`,
-                            fontFamily: "var(--font-body)",
-                          }}
-                        >
-                          {category}
-                        </span>
-                      </div>
-                      <div
-                        className="text-base leading-relaxed"
-                        style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
-                      >
-                        <TypewriterText text={frame.insight} speed={12} delay={idx * 200} />
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+                      {frame.name}
+                    </h3>
+                    <span
+                      className="text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                      style={{
+                        backgroundColor: cat.bg,
+                        color: cat.text,
+                        border: `1px solid ${cat.border}`,
+                        fontFamily: "var(--font-body)",
+                      }}
+                    >
+                      {category}
+                    </span>
+                  </div>
+                  <div
+                    className="text-sm leading-relaxed"
+                    style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
+                  >
+                    <TypewriterText text={frame.insight} speed={12} delay={idx * 200} showAll={showAll} />
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
+          {/* Synthesis — grounding, soft */}
           {showSynthesis && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-              className="rounded-xl p-8 sm:p-12 mt-4 relative overflow-hidden"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(17,17,16,0.97), rgba(38,33,30,0.94) 46%, rgba(58,45,36,0.92))",
-              }}
+              className="synthesis-block rounded-xl p-6 sm:p-8 mt-6"
               data-testid="synthesis-block"
             >
-              <div className="relative z-10">
-                <span
-                  className="text-xs uppercase tracking-[0.25em] font-medium block mb-4"
-                  style={{ color: "var(--text-inverse-secondary)", fontFamily: "var(--font-body)" }}
-                >
-                  Synthesis
-                </span>
-                <p
-                  className="text-lg sm:text-xl leading-relaxed"
-                  style={{
-                    fontFamily: "var(--font-heading)",
-                    color: "var(--text-inverse)",
-                    fontWeight: 300,
-                  }}
-                >
-                  <TypewriterText text={experiment.synthesis} speed={15} delay={300} />
-                </p>
-              </div>
+              <span
+                className="text-xs uppercase tracking-[0.25em] font-medium block mb-4"
+                style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
+              >
+                What may be keeping it stuck
+              </span>
+              <p
+                className="text-lg sm:text-xl leading-relaxed"
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  color: "var(--text-primary)",
+                  fontWeight: 300,
+                }}
+              >
+                <TypewriterText text={experiment.synthesis} speed={15} delay={300} showAll={showAll} />
+              </p>
             </motion.div>
           )}
         </>
@@ -220,7 +221,7 @@ export default function ResultsDisplay({ experiment, followUps }) {
       {followUps.length > 0 && (
         <div className="mt-10 space-y-6" data-testid="followup-results">
           {followUps.map((followUp, idx) => (
-            <FollowUpResult key={followUp.id || idx} followUp={followUp} />
+            <FollowUpResult key={followUp.id || idx} followUp={followUp} showAll={showAll} />
           ))}
         </div>
       )}

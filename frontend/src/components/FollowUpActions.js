@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -9,6 +9,8 @@ import {
   PauseCircle,
   Swords,
 } from "lucide-react";
+import { SUPPORT_URL } from "@/constants";
+import SupportModal from "./SupportModal";
 
 export default function FollowUpActions({
   experiment,
@@ -19,9 +21,12 @@ export default function FollowUpActions({
   resolutionLoading,
   resolutionFeedback,
   onBackToLenses,
+  onBackToInput,
   onStartOver,
 }) {
   const [showExploreOptions, setShowExploreOptions] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [hasShownSupportModal, setHasShownSupportModal] = useState(false);
 
   const followUpLimit = experiment?.limits?.follow_up_cap ?? 4;
   const followUpsRemaining = Math.max(followUpLimit - followUps.length, 0);
@@ -30,6 +35,15 @@ export default function FollowUpActions({
     [experiment?.ended_at, experiment?.resolution_action],
   );
   const canExploreMore = !loading && !isResolved && followUpsRemaining > 0 && experiment?.status !== "safety_hold";
+
+  useEffect(() => {
+    if (hasShownSupportModal || isResolved || followUps.length < 3) return;
+    const timer = setTimeout(() => {
+      setShowSupportModal(true);
+      setHasShownSupportModal(true);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [followUps.length, hasShownSupportModal, isResolved]);
 
   const handleDeeper = (lensName) => {
     setShowExploreOptions(false);
@@ -50,8 +64,8 @@ export default function FollowUpActions({
             <button onClick={onStartOver} className="site-pill-button site-pill-button--solid">
               Start a different reflection
             </button>
-            <button onClick={onBackToLenses} className="site-pill-button site-pill-button--ghost">
-              Return to lenses
+            <button onClick={onBackToInput} className="site-pill-button site-pill-button--ghost">
+              Edit the thought
             </button>
           </div>
         </div>
@@ -66,7 +80,7 @@ export default function FollowUpActions({
           className="text-xs uppercase tracking-[0.2em] font-medium block mb-5"
           style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
         >
-          Continue exploring
+          What would help now?
         </span>
 
         <div className="results-action-card">
@@ -84,13 +98,13 @@ export default function FollowUpActions({
           </motion.button>
 
           <div className="results-action-copy">
-            <h3>The clearest next step should be obvious.</h3>
+            <h3>If you're ready to decide, let the lab help.</h3>
             <p>
-              If you already see the trade-off, let the lab turn that perspective into a recommendation. If you still
-              need more texture, open the secondary actions below.
+              Use this when you've seen enough to want a clear direction. If you need another view first, try the
+              other options below.
             </p>
             {followUpsRemaining <= 0 && (
-              <p>You have used the follow-up limit for this session, so the next meaningful move is to close it or start fresh.</p>
+              <p>You've reached the follow-up limit for this session. The next move is to close it or start fresh.</p>
             )}
           </div>
         </div>
@@ -106,7 +120,7 @@ export default function FollowUpActions({
             data-testid="explore-further-btn"
           >
             <Layers size={15} />
-            Explore further
+            Try another angle
             <ChevronDown size={14} className={`transition-transform ${showExploreOptions ? "rotate-180" : ""}`} />
           </motion.button>
 
@@ -120,10 +134,9 @@ export default function FollowUpActions({
                 className="explore-panel"
               >
                 <div>
-                  <span className="section-eyebrow">Secondary moves</span>
+                  <span className="section-eyebrow">Other ways to look at it</span>
                   <p className="explore-panel-copy">
-                    Use these only if the main recommendation still feels too thin. You have {followUpsRemaining}{" "}
-                    follow-up {followUpsRemaining === 1 ? "move" : "moves"} left in this session.
+                    Each one adds one more angle. You have {followUpsRemaining} left in this session.
                   </p>
                 </div>
 
@@ -137,7 +150,7 @@ export default function FollowUpActions({
                     >
                       <span>
                         <Layers size={14} />
-                        Go deeper on {frame.name}
+                        See this through {frame.name}
                       </span>
                       <ArrowLeft size={14} className="rotate-180" />
                     </button>
@@ -153,7 +166,7 @@ export default function FollowUpActions({
                   >
                     <span>
                       <Swords size={14} />
-                      Hear the counter-argument
+                      Show the strongest counter-view
                     </span>
                     <ArrowLeft size={14} className="rotate-180" />
                   </button>
@@ -183,7 +196,7 @@ export default function FollowUpActions({
               style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
               data-testid="followup-loading"
             >
-              Thinking through the next angle...
+              Making this easier to see...
             </span>
           </motion.div>
         )}
@@ -202,13 +215,13 @@ export default function FollowUpActions({
                 </div>
                 <h3>
                   {resolutionFeedback === "clarity"
-                    ? "You marked this session as clear enough to close."
-                    : "You marked this session as something to sit with."}
+                    ? "Good. You got somewhere."
+                    : "Sometimes sitting with it is the answer."}
                 </h3>
                 <p>
                   {resolutionFeedback === "clarity"
-                    ? "That matters. The point of the lab is not endless exploration. It is to help you reach a steadier place."
-                    : "Not every thought needs an instant verdict. Sometimes clarity means knowing you can pause without forcing a conclusion."}
+                    ? "The lab is here to help you reach a clearer place, not to keep the loop going."
+                    : "Not every thought needs an instant verdict. Pausing without forcing a conclusion is its own kind of clarity."}
                 </p>
                 <div className="flex flex-wrap gap-3 mt-6">
                   <button onClick={onStartOver} className="site-pill-button site-pill-button--solid">
@@ -218,14 +231,32 @@ export default function FollowUpActions({
                     Revisit the lenses
                   </button>
                 </div>
+                <div
+                  className="mt-7 pt-6"
+                  style={{ borderTop: "1px solid var(--accent-border)" }}
+                >
+                  <p
+                    className="text-xs leading-relaxed mb-3"
+                    style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)", opacity: 0.7 }}
+                  >
+                    Thought Experiment Lab is free to use. If it helped you see something more clearly, you can support keeping it running.
+                  </p>
+                  <a
+                    href={SUPPORT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium transition-opacity hover:opacity-70"
+                    style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
+                  >
+                    Support the lab →
+                  </a>
+                </div>
               </>
             ) : (
               <>
                 <span className="section-eyebrow">Close the session</span>
-                <h3>When the thought has given you what it needed to give, end it on purpose.</h3>
-                <p>
-                  Keep this separate from the exploration buttons. It should feel like a calm exit, not another layer of decision fatigue.
-                </p>
+                <h3>Ready to close this thought?</h3>
+                <p>Ending a session on purpose is part of the process.</p>
                 <div className="flex flex-wrap gap-3 mt-6">
                   <button
                     onClick={() => onResolve("clarity")}
@@ -251,6 +282,8 @@ export default function FollowUpActions({
           </div>
         </div>
       </motion.div>
+
+      <SupportModal isOpen={showSupportModal} onClose={() => setShowSupportModal(false)} />
     </div>
   );
 }

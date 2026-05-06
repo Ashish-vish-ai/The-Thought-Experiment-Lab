@@ -1,4 +1,5 @@
 import "@/App.css";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LandingPage from "@/components/LandingPage";
 import InfoPage from "@/components/InfoPage";
@@ -9,17 +10,17 @@ const privacySections = [
   {
     title: "What We Store",
     body:
-      "We store the dilemma you write, the lenses you choose, the responses the lab generates, and whether you felt the session helped you close the thought cycle.",
+      "We store the dilemma you write, the lenses used, the responses the lab generates, and whether the session helped you close the thought cycle.",
   },
   {
     title: "What We Do Not Ask For",
     body:
-      "There are no accounts, no usernames, and no profile fields in the product flow. The app is designed to stay focused on the thought itself rather than personal identity.",
+      "There are no accounts, no usernames, and no profile fields in the product flow. Your reflections are not tied to a personal profile.",
   },
   {
-    title: "How To Use It Wisely",
+    title: "The Short Version",
     body:
-      "Treat the lab like a private thinking companion, not a vault for information you would never want stored anywhere. Sensitive thoughts can still be deeply personal even when they are anonymous.",
+      "No account is required, but sessions are stored as anonymous data so we can understand whether the lab is helping. Treat it as a clarity tool, not a vault for secrets.",
   },
 ];
 
@@ -32,29 +33,56 @@ const safetySections = [
   {
     title: "What The Lab Is Not For",
     body:
-      "It is not emergency support, not a therapist, and not a substitute for urgent real-world help. If something sounds life-threatening or dangerous, the normal reflection flow should stop.",
+      "It is not emergency support, not a therapist, and not a substitute for urgent real-world help. If something sounds life-threatening or dangerous, the lab will stop and direct you toward real help instead.",
   },
   {
     title: "When We Slow Things Down",
     body:
-      "If a prompt suggests self-harm, harm to someone else, or another immediate crisis, the app should move into a safer response mode and point the user toward human support and emergency resources.",
+      "If your message sounds like you or someone else may be in danger, the lab will pause and show support resources rather than continuing the exercise.",
   },
 ];
 
+function getInitialTheme() {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const storedTheme = window.localStorage.getItem("thought-lab-theme");
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function App() {
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.body.dataset.theme = theme;
+    window.localStorage.setItem("thought-lab-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  };
+
   return (
     <div className="App" style={{ fontFamily: "var(--font-body)" }}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/lab" element={<ThoughtLab />} />
+          <Route path="/" element={<LandingPage theme={theme} onToggleTheme={toggleTheme} />} />
+          <Route path="/lab" element={<ThoughtLab theme={theme} onToggleTheme={toggleTheme} />} />
           <Route
             path="/privacy"
             element={
               <InfoPage
+                theme={theme}
+                onToggleTheme={toggleTheme}
                 eyebrow="Privacy"
                 title="A clarity tool should earn trust before it earns attention."
-                intro="This product keeps the session focused on the user's thought. It stores the reflection itself, but it avoids turning people into accounts, profiles, or dossiers."
+                intro="The lab keeps the focus on your thought, not on you. It stores anonymous session data, but it doesn't turn you into an account, a profile, or a dossier."
                 sections={privacySections}
               />
             }
@@ -63,6 +91,8 @@ function App() {
             path="/safety"
             element={
               <InfoPage
+                theme={theme}
+                onToggleTheme={toggleTheme}
                 eyebrow="Safety"
                 title="Reflection is helpful. Emergencies need more than reflection."
                 intro="The lab is designed to support thoughtful decision-making, not to handle crises on its own. Serious, life-threatening situations deserve faster and more direct support."
@@ -73,7 +103,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-      <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" theme={theme} />
     </div>
   );
 }

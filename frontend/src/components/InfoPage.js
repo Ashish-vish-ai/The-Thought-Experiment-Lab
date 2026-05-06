@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
+import { SUPPORT_URL } from "@/constants";
 
-export default function InfoPage({ eyebrow, title, intro, sections }) {
+export default function InfoPage({ theme, onToggleTheme, eyebrow, title, intro, sections }) {
   return (
     <div className="public-page min-h-screen relative overflow-hidden">
       <div className="page-grain" />
@@ -19,13 +21,14 @@ export default function InfoPage({ eyebrow, title, intro, sections }) {
             Thought Experiment Lab
           </Link>
 
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-4 text-sm flex-wrap justify-end">
             <Link to="/privacy" className="transition-opacity hover:opacity-70" style={{ color: "var(--text-secondary)" }}>
               Privacy
             </Link>
             <Link to="/safety" className="transition-opacity hover:opacity-70" style={{ color: "var(--text-secondary)" }}>
               Safety
             </Link>
+            <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
             <Link to="/lab" className="site-pill-button site-pill-button--solid">
               Start the lab
             </Link>
@@ -65,6 +68,28 @@ export default function InfoPage({ eyebrow, title, intro, sections }) {
               Start a clarity session
               <ArrowRight size={16} />
             </Link>
+          </div>
+
+          <div
+            className="mt-16 pt-6 flex items-center justify-between flex-wrap gap-4"
+            style={{ borderTop: "1px solid var(--accent-border)" }}
+          >
+            <Link
+              to="/"
+              className="text-xs uppercase tracking-[0.2em]"
+              style={{ color: "var(--text-secondary)", opacity: 0.5, fontFamily: "var(--font-body)" }}
+            >
+              Thought Experiment Lab
+            </Link>
+            <a
+              href={SUPPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs transition-opacity hover:opacity-70"
+              style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
+            >
+              Support the lab
+            </a>
           </div>
         </main>
       </div>

@@ -3,12 +3,12 @@ import { Layers, Swords, Compass } from "lucide-react";
 import TypewriterText from "./TypewriterText";
 
 const actionLabels = {
-  deeper: { label: "Deeper Analysis", icon: Layers },
-  counter: { label: "Counter-Arguments", icon: Swords },
-  decide: { label: "Decision Recommendation", icon: Compass },
+  deeper: { label: "A clearer angle", icon: Layers },
+  counter: { label: "Strongest Counter-View", icon: Swords },
+  decide: { label: "Help me decide", icon: Compass },
 };
 
-function DeeperResult({ data }) {
+function DeeperResult({ data, showAll }) {
   return (
     <div>
       <h4
@@ -21,21 +21,21 @@ function DeeperResult({ data }) {
         className="text-base leading-relaxed mb-4"
         style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
       >
-        <TypewriterText text={data.deeper_insight} speed={12} />
+        <TypewriterText text={data.deeper_insight} speed={12} showAll={showAll} />
       </p>
       {data.question && (
         <p
           className="text-base italic leading-relaxed"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
-          <TypewriterText text={data.question} speed={15} delay={500} />
+          <TypewriterText text={data.question} speed={15} delay={500} showAll={showAll} />
         </p>
       )}
     </div>
   );
 }
 
-function CounterResult({ data }) {
+function CounterResult({ data, showAll }) {
   return (
     <div className="space-y-6">
       {data.counters?.map((c, i) => (
@@ -50,7 +50,7 @@ function CounterResult({ data }) {
             className="text-base leading-relaxed"
             style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
           >
-            <TypewriterText text={c.counter} speed={12} delay={i * 200} />
+            <TypewriterText text={c.counter} speed={12} delay={i * 200} showAll={showAll} />
           </p>
         </div>
       ))}
@@ -63,13 +63,13 @@ function CounterResult({ data }) {
             className="text-xs uppercase tracking-[0.2em] font-medium block mb-3"
             style={{ color: "var(--cat-deep-text)", fontFamily: "var(--font-body)" }}
           >
-            Revised Synthesis
+            What changes when you see the other side
           </span>
           <p
             className="text-base leading-relaxed"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
           >
-            <TypewriterText text={data.revised_synthesis} speed={15} delay={600} />
+            <TypewriterText text={data.revised_synthesis} speed={15} delay={600} showAll={showAll} />
           </p>
         </div>
       )}
@@ -77,7 +77,7 @@ function CounterResult({ data }) {
   );
 }
 
-function DecideResult({ data }) {
+function DecideResult({ data, showAll }) {
   return (
     <div>
       <div
@@ -94,7 +94,7 @@ function DecideResult({ data }) {
           className="text-lg leading-relaxed"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)", fontWeight: 500 }}
         >
-          <TypewriterText text={data.recommendation} speed={12} />
+          <TypewriterText text={data.recommendation} speed={12} showAll={showAll} />
         </p>
       </div>
 
@@ -104,7 +104,7 @@ function DecideResult({ data }) {
             className="text-xs uppercase tracking-[0.2em] font-medium block mb-3"
             style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
           >
-            Why
+            Why this fits
           </span>
           <div className="space-y-3">
             {data.reasons.map((reason, i) => (
@@ -123,7 +123,7 @@ function DecideResult({ data }) {
                   className="text-base leading-relaxed"
                   style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
                 >
-                  <TypewriterText text={reason} speed={12} delay={i * 300} />
+                  <TypewriterText text={reason} speed={12} delay={i * 300} showAll={showAll} />
                 </p>
               </div>
             ))}
@@ -143,7 +143,7 @@ function DecideResult({ data }) {
             className="text-base leading-relaxed"
             style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}
           >
-            <TypewriterText text={data.sacrifice} speed={12} delay={800} />
+            <TypewriterText text={data.sacrifice} speed={12} delay={800} showAll={showAll} />
           </p>
         </div>
       )}
@@ -153,14 +153,14 @@ function DecideResult({ data }) {
           className="text-lg leading-relaxed italic mt-6"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
-          <TypewriterText text={data.empowerment} speed={15} delay={1200} />
+          <TypewriterText text={data.empowerment} speed={15} delay={1200} showAll={showAll} />
         </p>
       )}
     </div>
   );
 }
 
-export default function FollowUpResult({ followUp }) {
+export default function FollowUpResult({ followUp, showAll = false }) {
   const config = actionLabels[followUp.action] || actionLabels.deeper;
   const ActionIcon = config.icon;
 
@@ -187,9 +187,9 @@ export default function FollowUpResult({ followUp }) {
         </span>
       </div>
 
-      {followUp.action === "deeper" && <DeeperResult data={followUp.data} />}
-      {followUp.action === "counter" && <CounterResult data={followUp.data} />}
-      {followUp.action === "decide" && <DecideResult data={followUp.data} />}
+      {followUp.action === "deeper" && <DeeperResult data={followUp.data} showAll={showAll} />}
+      {followUp.action === "counter" && <CounterResult data={followUp.data} showAll={showAll} />}
+      {followUp.action === "decide" && <DecideResult data={followUp.data} showAll={showAll} />}
     </motion.div>
   );
 }
